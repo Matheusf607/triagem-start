@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Painel Triagem START</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 900px;
+      margin: 20px auto;
+      padding: 10px;
+      background: #f9f9f9;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+    #triagensLista {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    #triagensLista th, #triagensLista td {
+      border: 1px solid #ccc;
+      padding: 12px 10px;
+      text-align: center;
+      font-size: 16px;
+    }
+    #triagensLista th {
+      background-color: #444;
+      color: white;
+    }
+    /* Cores das triagens para as linhas */
+    .vermelho {
+      background-color: #e53935;
+      color: white;
+      font-weight: bold;
+    }
+    .amarelo {
+      background-color: #fdd835;
+      color: black;
+      font-weight: bold;
+    }
+    .verde {
+      background-color: #43a047;
+      color: white;
+      font-weight: bold;
+    }
+    .preto {
+      background-color: #212121;
+      color: white;
+      font-weight: bold;
+    }
+    /* Responsividade simples */
+    @media (max-width: 600px) {
+      #triagensLista th, #triagensLista td {
+        font-size: 14px;
+        padding: 8px 6px;
+      }
+    }
+    #btnLimpar {
+      display: block;
+      margin: 20px auto;
+      padding: 12px 25px;
+      font-size: 16px;
+      font-weight: bold;
+      background-color: #e53935;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+    #btnLimpar:hover {
+      background-color: #b71c1c;
+    }
+  </style>
+</head>
+<body>
+  <h1>Painel Triagem START</h1>
+
+  <button id="btnLimpar">Limpar Tudo</button>
+
+  <table id="triagensLista">
+    <thead>
+      <tr>
+        <th>ID Vítima</th>
+        <th>Classificação</th>
+        <th>Observações</th>
+        <th>Data / Hora</th>
+      </tr>
+    </thead>
+    <tbody id="corpoTabela">
+      <tr><td colspan="4">Carregando triagens...</td></tr>
+    </tbody>
+  </table>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import {
+      getFirestore,
+      collection,
+      query,
+      orderBy,
+      onSnapshot,
+      getDocs,
+      deleteDoc,
+      doc
+    } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBjxPTK9SVkfk8G50OX-8bQAOm7BZ7s7ic",
+      authDomain: "start-5fe97.firebaseapp.com",
+      projectId: "start-5fe97",
+      storageBucket: "start-5fe97.firebasestorage.app",
+      messagingSenderId: "587385684473",
+      appId: "1:587385684473:web:8f30f359f291e553dbd28",
+      measurementId: "G-Q8QE3DW139"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const corpoTabela = document.getElementById('corpoTabela');
+    const btnLimpar = document.getElementById('btnLimpar');
+
+    // Consulta ordenada por dataHora decrescente (mais recente primeiro)
+    const triagensRef = collection(db, "triagens");
+    const q = query(triagensRef, orderBy("dataHora", "desc"));
+
+    function formatarData(data) {
+      const d = data.toDate ? data.toDate() : new Date(data);
+      return d.toLocaleString("pt-BR", {
+        day: "2-digit", month: "2-digit", year: "numeric",
+        hour: "2-digit", minute: "2-digit", second: "2-digit"
+      });
+    }
+
+    // Variável para controlar alertas para não repetir no mesmo documento
+    const triagensVermelhasTocadas = new Set();
+
+    // Função para tocar código morse SOS
+    function tocarMorseSOS() {
+      const ctx = new AudioContext();
+      const freq = 600; // frequência do tom em Hz
+      const dotDuration = 200;
+      const dashDuration = dotDuration * 3;
+      const gap = dotDuration;
+
+      let time = ctx.currentTime;
+
+      function tocarSom(dur) {
+        const osc = ctx.createOscillator();
+        const gainNode = ctx.createGain();
+
+        osc.frequency.value = freq;
+        osc.connect(gainNode);
+        gainNode.connect(ctx.destination);
+
+        gainNode.gain.setValueAtTime(1, time);
+        gainNode.gain.exponentialRampToValueAtTime(0.001, time + dur / 1000);
+
+        osc.start(time);
+        osc.stop(time + dur / 1000);
+
+        time += dur / 1000 + gap / 1000;
+      }
+
+      // S: dot dot dot
+      tocarSom(dotDuration);
+      tocarSom(dotDuration);
+      tocarSom(dotDuration);
+
+      // O: dash dash dash
+      tocarSom(dashDuration);
+      tocarSom(dashDuration);
+      tocarSom(dashDuration);
+
+      // S: dot dot dot
+      tocarSom(dotDuration);
+      tocarSom(dotDuration);
+      tocarSom(dotDuration);
+    }
+
+    // Escuta em tempo real as triagens
+    onSnapshot(q, (snapshot) => {
+      if (snapshot.empty) {
+        corpoTabela.innerHTML = `<tr><td colspan="4">Nenhuma triagem encontrada.</td></tr>`;
+        return;
+      }
+
+      corpoTabela.innerHTML = ""; // limpa tabela
+
+      snapshot.forEach(docSnap => {
+        const data = docSnap.data();
+
+        const id = docSnap.id;
+        const idVitima = data.idVitima || "—";
+        const classificacao = data.classificacao || "—";
+        const corClassificacao = data.corClassificacao || "";
+        const observacoes = data.observacoes || "";
+        const dataHora = data.dataHora ? formatarData(data.dataHora) : "—";
+
+        // Toca alerta sonoro só se for triagem vermelha nova
+        if (corClassificacao === "vermelho" && !triagensVermelhasTocadas.has(id)) {
+          tocarMorseSOS();
+          triagensVermelhasTocadas.add(id);
+        }
+
+        const tr = document.createElement('tr');
+        tr.className = corClassificacao;
+        tr.innerHTML = `
+          <td>${idVitima}</td>
+          <td>${classificacao}</td>
+          <td style="text-align: left; max-width: 400px; word-wrap: break-word;">${observacoes}</td>
+          <td>${dataHora}</td>
+        `;
+        corpoTabela.appendChild(tr);
+      });
+    }, (error) => {
+      corpoTabela.innerHTML = `<tr><td colspan="4">Erro ao carregar triagens: ${error.message}</td></tr>`;
+      console.error("Erro onSnapshot painel:", error);
+    });
+
+    // Função para apagar todas as triagens
+    async function limparTodasTriagens() {
+      if (!confirm("Tem certeza que deseja apagar todas as triagens? Essa ação não pode ser desfeita.")) {
+        return;
+      }
+
+      try {
+        const snapshot = await getDocs(triagensRef);
+        const batchSize = snapshot.size;
+
+        if (batchSize === 0) {
+          alert("Não há triagens para apagar.");
+          return;
+        }
+
+        // Apaga documentos um a um
+        for (const docSnap of snapshot.docs) {
+          await deleteDoc(doc(db, "triagens", docSnap.id));
+        }
+
+        alert("Todas as triagens foram apagadas com sucesso.");
+        triagensVermelhasTocadas.clear();
+      } catch (error) {
+        alert("Erro ao apagar triagens: " + error.message);
+        console.error("Erro apagar triagens:", error);
+      }
+    }
+
+    btnLimpar.addEventListener("click", limparTodasTriagens);
+  </script>
+</body>
+</html>

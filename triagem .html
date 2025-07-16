@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Triagem START - Campo</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 20px auto;
+      padding: 10px;
+      background: #f9f9f9;
+    }
+    h1 { text-align: center; }
+    .question { margin-top: 20px; font-size: 18px; }
+    .options button {
+      display: block;
+      margin: 10px 0;
+      padding: 10px;
+      width: 100%;
+      font-size: 16px;
+    }
+    .result {
+      margin-top: 30px;
+      padding: 20px;
+      font-size: 22px;
+      font-weight: bold;
+      text-align: center;
+      border-radius: 10px;
+    }
+    .vermelho { background-color: #e53935; color: white; }
+    .amarelo { background-color: #fdd835; color: black; }
+    .verde { background-color: #43a047; color: white; }
+    .preto { background-color: #212121; color: white; }
+    #novaTriagemBtn {
+      margin-top: 20px;
+      padding: 10px;
+      font-size: 16px;
+      width: 100%;
+      display: none;
+      cursor: pointer;
+    }
+    #botoesRapidos {
+      margin-top: 30px;
+      text-align: center;
+    }
+    #botoesRapidos button {
+      padding: 20px 30px;
+      font-size: 20px;
+      font-weight: bold;
+      margin: 10px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      min-width: 140px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Triagem START - Campo</h1>
+
+  <div id="triagem">
+    <div class="question" id="pergunta"></div>
+    <div class="options" id="opcoes"></div>
+
+    <label for="observacoes" style="margin-top: 20px; display: block; font-weight: bold;">Observações:</label>
+    <textarea id="observacoes" placeholder="Digite aqui observações importantes..." style="width: 100%; height: 80px; padding: 8px; font-size: 14px; margin-top: 8px; resize: vertical;"></textarea>
+  </div>
+
+  <div class="result" id="resultado"></div>
+  <button id="novaTriagemBtn">Nova Triagem</button>
+
+  <div id="botoesRapidos">
+    <h3>Triagem Rápida</h3>
+    <button id="btnVermelho" class="vermelho">Vermelho</button>
+    <button id="btnAmarelo" class="amarelo">Amarelo</button>
+    <button id="btnVerde" class="verde">Verde</button>
+    <button id="btnPreto" class="preto">Preto</button>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getFirestore, collection, addDoc } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBjxPTK9SVkfk8G50OX-8bQAOm7BZ7s7ic",
+      authDomain: "start-5fe97.firebaseapp.com",
+      projectId: "start-5fe97",
+      storageBucket: "start-5fe97.firebasestorage.app",
+      messagingSenderId: "587385684473",
+      appId: "1:587385684473:web:8f30f359f291e553dbd28",
+      measurementId: "G-Q8QE3DW139"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    const perguntas = [
+      {
+        texto: "A vítima consegue ANDAR?",
+        opcoes: [
+          { texto: "Sim", cor: "verde" },
+          { texto: "Não", proxima: 1 }
+        ]
+      },
+      {
+        texto: "A vítima está RESPIRANDO?",
+        opcoes: [
+          { texto: "Sim", proxima: 2 },
+          { texto: "Não, mesmo após abertura de vias aéreas", cor: "preto" },
+          { texto: "Não, mas voltou a respirar após abertura das vias aéreas", cor: "vermelho" }
+        ]
+      },
+      {
+        texto: "Frequência respiratória é maior que 30 rpm?",
+        opcoes: [
+          { texto: "Sim", cor: "vermelho" },
+          { texto: "Não", proxima: 3 }
+        ]
+      },
+      {
+        texto: "Perfusão normal (enchimento capilar ≤ 2 seg ou pulso radial presente)?",
+        opcoes: [
+          { texto: "Não", cor: "vermelho" },
+          { texto: "Sim", proxima: 4 }
+        ]
+      },
+      {
+        texto: "A vítima obedece comandos simples?",
+        opcoes: [
+          { texto: "Não", cor: "vermelho" },
+          { texto: "Sim", cor: "amarelo" }
+        ]
+      }
+    ];
+
+    let passo = 0;
+
+    function mostrarPergunta(passoAtual) {
+      const pergunta = perguntas[passoAtual];
+      document.getElementById("pergunta").textContent = pergunta.texto;
+      const opcoesDiv = document.getElementById("opcoes");
+      opcoesDiv.innerHTML = "";
+
+      pergunta.opcoes.forEach(opcao => {
+        const btn = document.createElement("button");
+        btn.textContent = opcao.texto;
+        btn.onclick = () => {
+          if (opcao.cor) {
+            mostrarResultado(opcao.cor);
+          } else if (opcao.proxima !== undefined) {
+            mostrarPergunta(opcao.proxima);
+          }
+        };
+        opcoesDiv.appendChild(btn);
+      });
+    }
+
+    async function salvarTriagem(cor, observacoes) {
+      const classificacoes = {
+        vermelho: "VERMELHO – Atendimento Imediato",
+        amarelo: "AMARELO – Atendimento Rápido",
+        verde: "VERDE – Ferimentos Leves",
+        preto: "PRETO – Óbito / Sem chances"
+      };
+
+      const idAleatorio = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      const idVitima = `V${idAleatorio}`;
+
+      try {
+        await addDoc(collection(db, "triagens"), {
+          dataHora: new Date(),
+          classificacao: classificacoes[cor],
+          corClassificacao: cor,
+          triador: "T01",
+          idVitima,
+          status: "triado",
+          observacoes: observacoes || ""
+        });
+        console.log("Triagem salva com sucesso!");
+      } catch (error) {
+        console.error("Erro ao salvar triagem:", error);
+      }
+    }
+
+    async function mostrarResultado(cor) {
+      const resultado = document.getElementById("resultado");
+      resultado.className = `result ${cor}`;
+      resultado.textContent = {
+        vermelho: "VERMELHO – Atendimento Imediato",
+        amarelo: "AMARELO – Atendimento Rápido",
+        verde: "VERDE – Ferimentos Leves",
+        preto: "PRETO – Óbito / Sem chances"
+      }[cor] || "";
+
+      document.getElementById("triagem").style.display = "none";
+      document.getElementById("novaTriagemBtn").style.display = "block";
+
+      const obs = document.getElementById("observacoes").value;
+
+      await salvarTriagem(cor, obs);
+    }
+
+    async function triagemRapida(cor) {
+      await mostrarResultado(cor);
+    }
+
+    function novaTriagem() {
+      passo = 0;
+      document.getElementById("resultado").textContent = "";
+      document.getElementById("resultado").className = "result";
+      document.getElementById("triagem").style.display = "block";
+      document.getElementById("novaTriagemBtn").style.display = "none";
+      document.getElementById("observacoes").value = "";
+      mostrarPergunta(passo);
+    }
+
+    // Inicializar a primeira pergunta
+    mostrarPergunta(passo);
+
+    // Botões triagem rápida - agora com event listeners para garantir funcionamento
+    document.getElementById("btnVermelho").addEventListener("click", () => triagemRapida("vermelho"));
+    document.getElementById("btnAmarelo").addEventListener("click", () => triagemRapida("amarelo"));
+    document.getElementById("btnVerde").addEventListener("click", () => triagemRapida("verde"));
+    document.getElementById("btnPreto").addEventListener("click", () => triagemRapida("preto"));
+
+    document.getElementById("novaTriagemBtn").addEventListener("click", novaTriagem);
+  </script>
+</body>
+</html>
