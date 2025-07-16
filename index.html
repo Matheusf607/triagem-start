@@ -42,6 +42,13 @@
     button#btnSocorrista:hover {
       background-color: #1565c0;
     }
+    button#btnPainel {
+      background-color: #fbc02d; /* amarelo */
+      color: #212121;
+    }
+    button#btnPainel:hover {
+      background-color: #f9a825;
+    }
   </style>
 </head>
 <body>
@@ -49,18 +56,22 @@
 
   <button id="btnTriador">Triador</button>
   <button id="btnSocorrista">Socorrista</button>
+  <button id="btnPainel">Painel</button>
 
   <script>
     document.getElementById('btnTriador').addEventListener('click', () => {
-      // Redireciona para a página da triagem do triador
-      window.location.href = 'triagem.html'; 
+      window.location.href = 'triagem.html';
     });
 
     document.getElementById('btnSocorrista').addEventListener('click', () => {
-      // Redireciona para a página do socorrista
-      window.location.href = 'socorrista.html'; 
+      window.location.href = 'socorrista.html';
+    });
+
+    document.getElementById('btnPainel').addEventListener('click', () => {
+      window.location.href = 'painel.html';
     });
   </script>
 </body>
 </html>
+
 
