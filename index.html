@@ -2,38 +2,65 @@
 <html lang="pt-br">
 <head>
   <meta charset="UTF-8" />
-  <title>Triagem START - Menu</title>
+  <title>Seleção de Usuário - Triagem START</title>
   <style>
     body {
       font-family: Arial, sans-serif;
       max-width: 400px;
       margin: 50px auto;
-      padding: 20px;
-      background: #f9f9f9;
       text-align: center;
+      background: #f9f9f9;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
     }
     h1 {
       margin-bottom: 40px;
     }
-    a.button {
+    button {
       display: block;
-      margin: 20px 0;
-      padding: 20px;
-      background-color: #007bff;
-      color: white;
-      text-decoration: none;
-      font-size: 24px;
+      width: 100%;
+      padding: 15px 0;
+      margin: 10px 0;
+      font-size: 18px;
+      cursor: pointer;
+      border: none;
       border-radius: 8px;
+      color: white;
+      font-weight: bold;
       transition: background-color 0.3s ease;
     }
-    a.button:hover {
-      background-color: #0056b3;
+    button#btnTriador {
+      background-color: #43a047; /* verde */
+    }
+    button#btnTriador:hover {
+      background-color: #388e3c;
+    }
+    button#btnSocorrista {
+      background-color: #1976d2; /* azul */
+    }
+    button#btnSocorrista:hover {
+      background-color: #1565c0;
     }
   </style>
 </head>
 <body>
-  <h1>Triagem START - Menu</h1>
-  <a href="triagem.html" class="button">Abrir Triagem</a>
-  <a href="painel.html" class="button">Abrir Painel</a>
+  <h1>Selecione o Perfil</h1>
+
+  <button id="btnTriador">Triador</button>
+  <button id="btnSocorrista">Socorrista</button>
+
+  <script>
+    document.getElementById('btnTriador').addEventListener('click', () => {
+      // Redireciona para a página da triagem do triador
+      window.location.href = 'triagem.html'; 
+    });
+
+    document.getElementById('btnSocorrista').addEventListener('click', () => {
+      // Redireciona para a página do socorrista
+      window.location.href = 'socorrista.html'; 
+    });
+  </script>
 </body>
 </html>
+
