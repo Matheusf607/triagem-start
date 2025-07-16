@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <title>Painel Socorrista - Reclassificação START</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 700px;
+      margin: 20px auto;
+      padding: 10px;
+      background: #f9f9f9;
+    }
+    h1, h2 {
+      text-align: center;
+    }
+    label {
+      font-weight: bold;
+      margin-top: 10px;
+      display: block;
+    }
+    input[type=text] {
+      width: 100%;
+      padding: 8px;
+      margin-top: 5px;
+      box-sizing: border-box;
+      font-size: 16px;
+    }
+    button {
+      margin-top: 15px;
+      padding: 12px;
+      font-size: 18px;
+      width: 100%;
+      cursor: pointer;
+      background-color: #1976d2;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      font-weight: bold;
+    }
+    button:hover {
+      background-color: #1565c0;
+    }
+    #reclassificacao, #fluxoTriagem {
+      margin-top: 30px;
+      padding: 15px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      background: white;
+    }
+    #historico {
+      margin-top: 20px;
+      background: #e3f2fd;
+      padding: 10px;
+      border-radius: 6px;
+      max-height: 250px;
+      overflow-y: auto;
+      font-size: 14px;
+    }
+    .historico-item {
+      margin-bottom: 8px;
+      padding: 6px;
+      border-bottom: 1px solid #90caf9;
+    }
+    .result {
+      margin-top: 20px;
+      padding: 20px;
+      font-size: 22px;
+      font-weight: bold;
+      text-align: center;
+      border-radius: 10px;
+      color: white;
+    }
+    .vermelho { background-color: #e53935; }
+    .amarelo { background-color: #fdd835; color: black; }
+    .verde { background-color: #43a047; }
+    .preto { background-color: #212121; }
+    .reclassificado-tag {
+      background: #00796b;
+      color: white;
+      font-weight: bold;
+      font-size: 12px;
+      padding: 2px 5px;
+      border-radius: 4px;
+      margin-left: 8px;
+    }
+    .question {
+      margin-top: 15px;
+      font-size: 18px;
+      font-weight: bold;
+    }
+    .options button {
+      display: block;
+      margin: 10px 0;
+      padding: 12px;
+      width: 100%;
+      font-size: 18px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Painel Socorrista - Reclassificação START</h1>
+
+  <label for="idSocorrista">Seu ID (ex: S01):</label>
+  <input type="text" id="idSocorrista" placeholder="Digite seu ID de socorrista" />
+
+  <label for="idVitima">ID da vítima (ex: V0001):</label>
+  <input type="text" id="idVitima" placeholder="Digite o ID da vítima" />
+
+  <button id="btnBuscar">Buscar Vítima</button>
+
+  <div id="dadosVitima" style="display:none;">
+    <h2>Dados da Vítima <span id="vitimaAtual"></span></h2>
+    <div><strong>Classificação Atual:</strong> <span id="classificacaoAtual"></span></div>
+    <div><strong>Observações:</strong> <span id="observacoesAtuais"></span></div>
+
+    <div id="historico">
+      <h3>Histórico de Triagens e Reclassificações:</h3>
+      <div id="listaHistorico"></div>
+    </div>
+
+    <button id="btnReclassificar">Iniciar Reclassificação</button>
+  </div>
+
+  <div id="fluxoTriagem" style="display:none;">
+    <div class="question" id="pergunta"></div>
+    <div class="options" id="opcoes"></div>
+    <div style="margin-top:15px;">
+      <label for="observacoesReavaliacao"><strong>Observações adicionais:</strong></label>
+      <textarea id="observacoesReavaliacao" rows="3" style="width:100%; font-size:16px; padding:6px;"></textarea>
+    </div>
+    <button id="btnSalvarReclassificacao" style="background:#00796b; margin-top:20px;">Salvar Reclassificação</button>
+    <button id="btnCancelarReclassificacao" style="background:#bdbdbd; margin-top:10px;">Cancelar</button>
+  </div>
+
+  <div id="resultadoReclassificacao" class="result" style="display:none;"></div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+    import { getFirestore, collection, doc, getDoc, updateDoc, query, where, getDocs, addDoc, orderBy } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBjxPTK9SVkfk8G50OX-8bQAOm7BZ7s7ic",
+      authDomain: "start-5fe97.firebaseapp.com",
+      projectId: "start-5fe97",
+      storageBucket: "start-5fe97.firebasestorage.app",
+      messagingSenderId: "587385684473",
+      appId: "1:587385684473:web:8f30f359f291e5535dbd28",
+      measurementId: "G-Q8QE3DW139"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // START perguntas fluxo - mesma do triador
+    const perguntas = [
+      {
+        texto: "A vítima consegue ANDAR?",
+        opcoes: [
+          { texto: "Sim", cor: "verde" },
+          { texto: "Não", proxima: 1 }
+        ]
+      },
+      {
+        texto: "A vítima está RESPIRANDO?",
+        opcoes: [
+          { texto: "Sim", proxima: 2 },
+          { texto: "Não, mesmo após abertura de vias aéreas", cor: "preto" },
+          { texto: "Não, mas voltou a respirar após abertura das vias aéreas", cor: "vermelho" }
+        ]
+      },
+      {
+        texto: "Frequência respiratória é maior que 30 rpm?",
+        opcoes: [
+          { texto: "Sim", cor: "vermelho" },
+          { texto: "Não", proxima: 3 }
+        ]
+      },
+      {
+        texto: "Perfusão normal (enchimento capilar ≤ 2 seg ou pulso radial presente)?",
+        opcoes: [
+          { texto: "Não", cor: "vermelho" },
+          { texto: "Sim", proxima: 4 }
+        ]
+      },
+      {
+        texto: "A vítima obedece comandos simples?",
+        opcoes: [
+          { texto: "Não", cor: "vermelho" },
+          { texto: "Sim", cor: "amarelo" }
+        ]
+      }
+    ];
+
+    // Variáveis para fluxo
+    let passo = 0;
+    let classificacaoAtualCor = "";
+    let novaClassificacaoCor = "";
+    let idVitimaAtual = "";
+    let idSocorristaAtual = "";
+
+    const btnBuscar = document.getElementById("btnBuscar");
+    const idVitimaInput = document.getElementById("idVitima");
+    const idSocorristaInput = document.getElementById("idSocorrista");
+    const dadosVitimaDiv = document.getElementById("dadosVitima");
+    const vitimaAtualSpan = document.getElementById("vitimaAtual");
+    const classificacaoAtualSpan = document.getElementById("classificacaoAtual");
+    const observacoesAtuaisSpan = document.getElementById("observacoesAtuais");
+    const listaHistoricoDiv = document.getElementById("listaHistorico");
+    const btnReclassificar = document.getElementById("btnReclassificar");
+    const fluxoTriagemDiv = document.getElementById("fluxoTriagem");
+    const perguntaDiv = document.getElementById("pergunta");
+    const opcoesDiv = document.getElementById("opcoes");
+    const btnSalvarReclassificacao = document.getElementById("btnSalvarReclassificacao");
+    const btnCancelarReclassificacao = document.getElementById("btnCancelarReclassificacao");
+    const observacoesReavaliacaoInput = document.getElementById("observacoesReavaliacao");
+    const resultadoReclassificacaoDiv = document.getElementById("resultadoReclassificacao");
+
+    // Texto classificações
+    const classificacoesTexto = {
+      vermelho: "VERMELHO – Atendimento Imediato",
+      amarelo: "AMARELO – Atendimento Rápido",
+      verde: "VERDE – Ferimentos Leves",
+      preto: "PRETO – Óbito / Sem chances"
+    };
+
+    btnBuscar.onclick = async () => {
+      const idVitima = idVitimaInput.value.trim().toUpperCase();
+      const idSocorrista = idSocorristaInput.value.trim().toUpperCase();
+
+      if (!idVitima) {
+        alert("Por favor, digite o ID da vítima.");
+        return;
+      }
+      if (!idSocorrista) {
+        alert("Por favor, digite seu ID de socorrista.");
+        return;
+      }
+
+      idVitimaAtual = idVitima;
+      idSocorristaAtual = idSocorrista;
+      await buscarDadosVitima(idVitima);
+    };
+
+    async function buscarDadosVitima(idVitima) {
+      // Busca a última triagem / reclassificação para mostrar dados atuais
+      const triagensRef = collection(db, "triagens");
+      const q = query(triagensRef, where("idVitima", "==", idVitima), orderBy("dataHora", "desc"));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        alert("Nenhuma triagem encontrada para essa vítima.");
+        dadosVitimaDiv.style.display = "none";
+        fluxoTriagemDiv.style.display = "none";
+        resultadoReclassificacaoDiv.style.display = "none";
+        return;
+      }
+
+      // Pega a última triagem
+      let ultimaTriagem = null;
+      let historicoHtml = "";
+      querySnapshot.forEach(docSnap => {
+        const data = docSnap.data();
+        if (!ultimaTriagem) ultimaTriagem = { id: docSnap.id, ...data };
+        // Monta histórico
+        const timestamp = data.dataHora?.toDate?.() || data.dataHora;
+        const dataFormatada = timestamp instanceof Date ? timestamp.toLocaleString() : timestamp;
+        const corClass = data.corClassificacao || "";
+        const reclassificado = data.reclassificado || false;
+        historicoHtml += `<div class="historico-item">
+          <strong style="color:${corClass === 'preto' ? '#444' : corClass};">
+            ${classificacoesTexto[corClass] || corClass}
+          </strong>
+          ${reclassificado ? `<span class="reclassificado-tag">Reclassificado</span>` : ""}
+          <br><small><em>${dataFormatada}</em></small>
+          <br><small>Por: ${data.triador || data.socorrista || "Desconhecido"}</small>
+          <br><small>Obs: ${data.observacoes || "-"}</small>
+        </div>`;
+      });
+
+      // Exibir dados atuais
+      classificacaoAtualCor = ultimaTriagem.corClassificacao;
+      vitimaAtualSpan.textContent = idVitima;
+      classificacaoAtualSpan.textContent = classificacoesTexto[classificacaoAtualCor] || "Sem classificação";
+      classificacaoAtualSpan.className = "";
+      classificacaoAtualSpan.classList.add(classificacaoAtualCor);
+      observacoesAtuaisSpan.textContent = ultimaTriagem.observacoes || "-";
+
+      listaHistoricoDiv.innerHTML = historicoHtml;
+
+      dadosVitimaDiv.style.display = "block";
+      fluxoTriagemDiv.style.display = "none";
+      resultadoReclassificacaoDiv.style.display = "none";
+    }
+
+    btnReclassificar.onclick = () => {
+      passo = 0;
+      novaClassificacaoCor = "";
+      resultadoReclassificacaoDiv.style.display = "none";
+      dadosVitimaDiv.style.display = "none";
+      fluxoTriagemDiv.style.display = "block";
+      observacoesReavaliacaoInput.value = "";
+      mostrarPergunta(passo);
+    };
+
+    function mostrarPergunta(passoAtual) {
+      const pergunta = perguntas[passoAtual];
+      perguntaDiv.textContent = pergunta.texto;
+      opcoesDiv.innerHTML = "";
+
+      pergunta.opcoes.forEach(opcao => {
+        const btn = document.createElement("button");
+        btn.textContent = opcao.texto;
+        btn.style.backgroundColor = opcao.cor ? corParaHex(opcao.cor) : "#2196f3";
+        btn.style.color = opcao.cor === "amarelo" ? "black" : "white";
+        btn.onclick = () => {
+          if (opcao.cor) {
+            novaClassificacaoCor = opcao.cor;
+            mostrarResultado(novaClassificacaoCor);
+          } else if (opcao.proxima !== undefined) {
+            mostrarPergunta(opcao.proxima);
+          }
+        };
+        opcoesDiv.appendChild(btn);
+      });
+    }
+
+    function corParaHex(cor) {
+      const cores = {
+        vermelho: "#e53935",
+        amarelo: "#fdd835",
+        verde: "#43a047",
+        preto: "#212121"
+      };
+      return cores[cor] || "#2196f3";
+    }
+
+    async function mostrarResultado(cor) {
+      novaClassificacaoCor = cor;
+      perguntaDiv.textContent = "";
+      opcoesDiv.innerHTML = "";
+      btnSalvarReclassificacao.style.display = "inline-block";
+      btnCancelarReclassificacao.style.display = "inline-block";
+      resultadoReclassificacaoDiv.style.display = "none";
+    }
+
+    btnSalvarReclassificacao.onclick = async () => {
+      if (!novaClassificacaoCor) {
+        alert("Selecione uma classificação antes de salvar.");
+        return;
+      }
+
+      const observacoes = observacoesReavaliacaoInput.value.trim();
+
+      try {
+        await addDoc(collection(db, "triagens"), {
+          dataHora: new Date(),
+          classificacao: classificacoesTexto[novaClassificacaoCor],
+          corClassificacao: novaClassificacaoCor,
+          triador: idSocorristaAtual,
+          idVitima: idVitimaAtual,
+          status: "reclassificado",
+          reclassificado: true,
+          observacoes,
+          historico: true
+        });
+
+        resultadoReclassificacaoDiv.className = "result " + novaClassificacaoCor;
+        resultadoReclassificacaoDiv.textContent = `Reclassificação salva: ${classificacoesTexto[novaClassificacaoCor]}`;
+        resultadoReclassificacaoDiv.style.display = "block";
+
+        // Reset visual
+        fluxoTriagemDiv.style.display = "none";
+        dadosVitimaDiv.style.display = "block";
+        btnSalvarReclassificacao.style.display = "none";
+        btnCancelarReclassificacao.style.display = "none";
+
+        // Atualiza dados da vítima e histórico
+        await buscarDadosVitima(idVitimaAtual);
+
+      } catch (error) {
+        alert("Erro ao salvar reclassificação: " + error.message);
+      }
+    };
+
+    btnCancelarReclassificacao.onclick = () => {
+      fluxoTriagemDiv.style.display = "none";
+      dadosVitimaDiv.style.display = "block";
+      resultadoReclassificacaoDiv.style.display = "none";
+    };
+
+  </script>
+</body>
+</html>
