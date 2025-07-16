@@ -1,255 +1,206 @@
 <!DOCTYPE html>
 <html lang="pt-br">
 <head>
-  <meta charset="UTF-8" />
-  <title>Painel Triagem START</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 900px;
-      margin: 20px auto;
-      padding: 10px;
-      background: #f9f9f9;
-    }
-    h1 {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    #triagensLista {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    #triagensLista th, #triagensLista td {
-      border: 1px solid #ccc;
-      padding: 12px 10px;
-      text-align: center;
-      font-size: 16px;
-    }
-    #triagensLista th {
-      background-color: #444;
-      color: white;
-    }
-    /* Cores das triagens para as linhas */
-    .vermelho {
-      background-color: #e53935;
-      color: white;
-      font-weight: bold;
-    }
-    .amarelo {
-      background-color: #fdd835;
-      color: black;
-      font-weight: bold;
-    }
-    .verde {
-      background-color: #43a047;
-      color: white;
-      font-weight: bold;
-    }
-    .preto {
-      background-color: #212121;
-      color: white;
-      font-weight: bold;
-    }
-    /* Responsividade simples */
-    @media (max-width: 600px) {
-      #triagensLista th, #triagensLista td {
-        font-size: 14px;
-        padding: 8px 6px;
-      }
-    }
-    #btnLimpar {
-      display: block;
-      margin: 20px auto;
-      padding: 12px 25px;
-      font-size: 16px;
-      font-weight: bold;
-      background-color: #e53935;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: background-color 0.3s ease;
-    }
-    #btnLimpar:hover {
-      background-color: #b71c1c;
-    }
-  </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Painel Triagem START</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0; padding: 0;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+  #listaVitimas {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    background: #f9f9f9;
+  }
+  h1 {
+    text-align: center;
+  }
+  .vitima-card {
+    padding: 15px;
+    margin: 10px 0;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+    box-shadow: 0 0 5px rgba(0,0,0,0.1);
+  }
+  .vermelho { background-color: #e53935; }
+  .amarelo { background-color: #fdd835; color: black; }
+  .verde { background-color: #43a047; }
+  .preto { background-color: #212121; }
+
+  /* Painel lateral */
+  #painelLateral {
+    width: 0;
+    max-width: 400px;
+    background: white;
+    box-shadow: -3px 0 10px rgba(0,0,0,0.2);
+    overflow-y: auto;
+    transition: width 0.3s ease;
+    padding: 0 20px;
+    position: relative;
+  }
+  #painelLateral.aberto {
+    width: 400px;
+  }
+  #painelLateral h2 {
+    margin-top: 20px;
+    border-bottom: 1px solid #ddd;
+    padding-bottom: 5px;
+  }
+  #fecharPainel {
+    position: absolute;
+    top: 10px;
+    right: 15px;
+    font-size: 22px;
+    cursor: pointer;
+  }
+  .historico-item {
+    border-bottom: 1px solid #eee;
+    padding: 10px 0;
+  }
+  .historico-item:last-child {
+    border-bottom: none;
+  }
+  .label-cor {
+    font-weight: bold;
+    margin-right: 5px;
+  }
+  .reclassificado-tag {
+    font-size: 0.9em;
+    background: #ff9800;
+    color: black;
+    border-radius: 4px;
+    padding: 2px 6px;
+    margin-left: 10px;
+  }
+</style>
 </head>
 <body>
-  <h1>Painel Triagem START</h1>
 
-  <button id="btnLimpar">Limpar Tudo</button>
+<div id="listaVitimas">
+  <h1>Painel de Triagens</h1>
+  <div id="vitimasContainer">Carregando vítimas...</div>
+</div>
 
-  <table id="triagensLista">
-    <thead>
-      <tr>
-        <th>ID Vítima</th>
-        <th>Classificação</th>
-        <th>Observações</th>
-        <th>Data / Hora</th>
-      </tr>
-    </thead>
-    <tbody id="corpoTabela">
-      <tr><td colspan="4">Carregando triagens...</td></tr>
-    </tbody>
-  </table>
+<div id="painelLateral">
+  <span id="fecharPainel">&times;</span>
+  <h2>Histórico da vítima</h2>
+  <div id="historicoContainer">Selecione uma vítima para ver o histórico.</div>
+</div>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
-    import {
-      getFirestore,
-      collection,
-      query,
-      orderBy,
-      onSnapshot,
-      getDocs,
-      deleteDoc,
-      doc
-    } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+  import { getFirestore, collection, query, where, orderBy, limit, getDocs } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyBjxPTK9SVkfk8G50OX-8bQAOm7BZ7s7ic",
-      authDomain: "start-5fe97.firebaseapp.com",
-      projectId: "start-5fe97",
-      storageBucket: "start-5fe97.firebasestorage.app",
-      messagingSenderId: "587385684473",
-      appId: "1:587385684473:web:8f30f359f291e553dbd28",
-      measurementId: "G-Q8QE3DW139"
-    };
+  const firebaseConfig = {
+    apiKey: "AIzaSyBjxPTK9SVkfk8G50OX-8bQAOm7BZ7s7ic",
+    authDomain: "start-5fe97.firebaseapp.com",
+    projectId: "start-5fe97",
+    storageBucket: "start-5fe97.firebasestorage.app",
+    messagingSenderId: "587385684473",
+    appId: "1:587385684473:web:8f30f359f291e5535dbd28",
+    measurementId: "G-Q8QE3DW139"
+  };
 
-    const app = initializeApp(firebaseConfig);
-    const db = getFirestore(app);
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
 
-    const corpoTabela = document.getElementById('corpoTabela');
-    const btnLimpar = document.getElementById('btnLimpar');
+  const vitimasContainer = document.getElementById("vitimasContainer");
+  const painelLateral = document.getElementById("painelLateral");
+  const fecharPainelBtn = document.getElementById("fecharPainel");
+  const historicoContainer = document.getElementById("historicoContainer");
 
-    // Consulta ordenada por dataHora decrescente (mais recente primeiro)
-    const triagensRef = collection(db, "triagens");
-    const q = query(triagensRef, orderBy("dataHora", "desc"));
+  // Busca a última triagem/reclassificação para cada vítima (agrupar por idVitima)
+  // Como Firestore não tem "group by", vamos buscar todas triagens ordenadas por data, depois
+  // filtrar localmente as últimas por vítima.
 
-    function formatarData(data) {
-      const d = data.toDate ? data.toDate() : new Date(data);
-      return d.toLocaleString("pt-BR", {
-        day: "2-digit", month: "2-digit", year: "numeric",
-        hour: "2-digit", minute: "2-digit", second: "2-digit"
-      });
-    }
+  async function carregarVitimas() {
+    vitimasContainer.textContent = "Carregando vítimas...";
 
-    // Variável para controlar alertas para não repetir no mesmo documento
-    const triagensVermelhasTocadas = new Set();
+    const triagensSnapshot = await getDocs(query(
+      collection(db, "triagens"),
+      orderBy("dataHora", "desc"),
+      limit(1000) // limite para evitar puxar tudo, ajuste se quiser
+    ));
 
-    // Função para tocar código morse SOS
-    function tocarMorseSOS() {
-      const ctx = new AudioContext();
-      const freq = 600; // frequência do tom em Hz
-      const dotDuration = 200;
-      const dashDuration = dotDuration * 3;
-      const gap = dotDuration;
+    // Map para guardar a última triagem por idVitima
+    const ultimaTriagemPorVitima = new Map();
 
-      let time = ctx.currentTime;
-
-      function tocarSom(dur) {
-        const osc = ctx.createOscillator();
-        const gainNode = ctx.createGain();
-
-        osc.frequency.value = freq;
-        osc.connect(gainNode);
-        gainNode.connect(ctx.destination);
-
-        gainNode.gain.setValueAtTime(1, time);
-        gainNode.gain.exponentialRampToValueAtTime(0.001, time + dur / 1000);
-
-        osc.start(time);
-        osc.stop(time + dur / 1000);
-
-        time += dur / 1000 + gap / 1000;
+    triagensSnapshot.forEach(doc => {
+      const data = doc.data();
+      const idVitima = data.idVitima;
+      if (!ultimaTriagemPorVitima.has(idVitima)) {
+        ultimaTriagemPorVitima.set(idVitima, { id: doc.id, ...data });
       }
-
-      // S: dot dot dot
-      tocarSom(dotDuration);
-      tocarSom(dotDuration);
-      tocarSom(dotDuration);
-
-      // O: dash dash dash
-      tocarSom(dashDuration);
-      tocarSom(dashDuration);
-      tocarSom(dashDuration);
-
-      // S: dot dot dot
-      tocarSom(dotDuration);
-      tocarSom(dotDuration);
-      tocarSom(dotDuration);
-    }
-
-    // Escuta em tempo real as triagens
-    onSnapshot(q, (snapshot) => {
-      if (snapshot.empty) {
-        corpoTabela.innerHTML = `<tr><td colspan="4">Nenhuma triagem encontrada.</td></tr>`;
-        return;
-      }
-
-      corpoTabela.innerHTML = ""; // limpa tabela
-
-      snapshot.forEach(docSnap => {
-        const data = docSnap.data();
-
-        const id = docSnap.id;
-        const idVitima = data.idVitima || "—";
-        const classificacao = data.classificacao || "—";
-        const corClassificacao = data.corClassificacao || "";
-        const observacoes = data.observacoes || "";
-        const dataHora = data.dataHora ? formatarData(data.dataHora) : "—";
-
-        // Toca alerta sonoro só se for triagem vermelha nova
-        if (corClassificacao === "vermelho" && !triagensVermelhasTocadas.has(id)) {
-          tocarMorseSOS();
-          triagensVermelhasTocadas.add(id);
-        }
-
-        const tr = document.createElement('tr');
-        tr.className = corClassificacao;
-        tr.innerHTML = `
-          <td>${idVitima}</td>
-          <td>${classificacao}</td>
-          <td style="text-align: left; max-width: 400px; word-wrap: break-word;">${observacoes}</td>
-          <td>${dataHora}</td>
-        `;
-        corpoTabela.appendChild(tr);
-      });
-    }, (error) => {
-      corpoTabela.innerHTML = `<tr><td colspan="4">Erro ao carregar triagens: ${error.message}</td></tr>`;
-      console.error("Erro onSnapshot painel:", error);
     });
 
-    // Função para apagar todas as triagens
-    async function limparTodasTriagens() {
-      if (!confirm("Tem certeza que deseja apagar todas as triagens? Essa ação não pode ser desfeita.")) {
-        return;
-      }
-
-      try {
-        const snapshot = await getDocs(triagensRef);
-        const batchSize = snapshot.size;
-
-        if (batchSize === 0) {
-          alert("Não há triagens para apagar.");
-          return;
-        }
-
-        // Apaga documentos um a um
-        for (const docSnap of snapshot.docs) {
-          await deleteDoc(doc(db, "triagens", docSnap.id));
-        }
-
-        alert("Todas as triagens foram apagadas com sucesso.");
-        triagensVermelhasTocadas.clear();
-      } catch (error) {
-        alert("Erro ao apagar triagens: " + error.message);
-        console.error("Erro apagar triagens:", error);
-      }
+    if (ultimaTriagemPorVitima.size === 0) {
+      vitimasContainer.textContent = "Nenhuma vítima triada ainda.";
+      return;
     }
 
-    btnLimpar.addEventListener("click", limparTodasTriagens);
-  </script>
+    vitimasContainer.innerHTML = "";
+
+    ultimaTriagemPorVitima.forEach(vitima => {
+      const div = document.createElement("div");
+      div.className = `vitima-card ${vitima.corClassificacao}`;
+      div.innerHTML = `
+        <strong>ID: ${vitima.idVitima}</strong><br />
+        <span>${vitima.classificacao}${vitima.reclassificado ? '<span class="reclassificado-tag">Reclassificado</span>' : ''}</span><br />
+        <small>Última atualização: ${new Date(vitima.dataHora.seconds * 1000).toLocaleString()}</small>
+      `;
+      div.addEventListener("click", () => abrirHistorico(vitima.idVitima));
+      vitimasContainer.appendChild(div);
+    });
+  }
+
+  async function abrirHistorico(idVitima) {
+    painelLateral.classList.add("aberto");
+    historicoContainer.innerHTML = "Carregando histórico...";
+
+    // Busca todas triagens da vítima
+    const q = query(
+      collection(db, "triagens"),
+      where("idVitima", "==", idVitima),
+      orderBy("dataHora", "asc")
+    );
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      historicoContainer.textContent = "Nenhum histórico encontrado para essa vítima.";
+      return;
+    }
+
+    historicoContainer.innerHTML = "";
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      const dt = new Date(d.dataHora.seconds * 1000).toLocaleString();
+      const reclassTag = d.reclassificado ? '<span class="reclassificado-tag">Reclassificado</span>' : '';
+
+      const item = document.createElement("div");
+      item.className = "historico-item";
+      item.innerHTML = `
+        <div><span class="label-cor">Classificação:</span><strong class="${d.corClassificacao}">${d.classificacao}</strong> ${reclassTag}</div>
+        <div><span class="label-cor">Data:</span> ${dt}</div>
+        <div><span class="label-cor">Triador/Socorrista:</span> ${d.triador || d.socorrista || "Desconhecido"}</div>
+        <div><span class="label-cor">Observações:</span> ${d.observacoes || "-"}</div>
+      `;
+      historicoContainer.appendChild(item);
+    });
+  }
+
+  fecharPainelBtn.addEventListener("click", () => {
+    painelLateral.classList.remove("aberto");
+  });
+
+  carregarVitimas();
+</script>
+
 </body>
 </html>
